@@ -38,3 +38,6 @@ the response variable, methylation of individual CpG probes were the predictor o
 **Script 5: PGCpipeline-5-CellSpecificEWAS.R**  
 To identify cell-specific differences, we used the [TOAST R package](https://www.bioconductor.org/packages/release/bioc/html/TOAST.html), using **PTSD** as the main effect and **Age/Sex** as covariates. 
 
+### 6. Rmarkdown Summary.
+**Script 6: PGC_Analysis_Summary.Rmd**  
+R Markdown document for the summary of cross-sectional analysis using PGC pipeline.
