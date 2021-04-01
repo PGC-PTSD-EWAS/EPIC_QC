@@ -1,0 +1,294 @@
+---
+title: "Analysis Summary" # Write Cohort Name here
+output: html_notebook
+date: Created on December 14, 2020 and last compiled on `r format(Sys.Date(), "%B %d,
+  %Y")`
+---
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE, results='hide'}
+library(yaml)
+library(feather)
+library(knitr)
+library(data.table)
+library(kableExtra)
+```
+
+##### This is an R Markdown document for the summary of cross-sectional analysis of BEAR samples using PGC pipeline. All samples are from unique study participants and all are trauma exposed. The response variable is PTSD. Following are the steps.
+
+**1.Cleaning data and performing quality control checks.** 
+Numerous quality control checks such as Illumina type 17 metrics (described in [BeadArray Controls Reporter Software Guide from Illumina](https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/infinium_assays/infinium_hd_methylation/beadarray-controls-reporter-user-guide-1000000004009-00.pdf)), 
+genotype calling for duplication and outlier check based on three categories **(AA, AB, BB)** were performed. 
+Probes which didn't fit in these three categories were flaged as outliers.
+
+
+**2. Preprocessing, Normalization and ComBat adjustment.** 
+In this step, data preprocessing and normalization were performed. Quality control for sex discordance, removing probes and samples with > 10% missing values 
+and detection p-values cutoff was set to 0.01. Also, [cross hybridized probes](http://www.sciencedirect.com/science/article/pii/S221359601630071X) were removed. 
+Then beta values were imputed followed by ComBAT adjustment for chip id and position preserving variation for PTSD, age, and sex (if relevant). After comBAT adjustment, 
+missing values were inserted back at the appropriate locations.
+
+
+**3.Cell proportion estimation and calculating principal components.** We used [IDOL algorithm](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-016-0943-7) 
+to estimate the cell proportions. Principal components were calculated as described in [Barfield et al](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4090102/). If you have GWAS data, it is recommended to use that for calculating PCs. In that case you don't need to use *Barfield* approach.
+
+
+**4.CpG association check (EWAS).** CpG association analysis was performed on the normalized and combat adjusted data. **PTSD** was
+the response variable, methylation of individual CpG probes were the predictor of interest, and **PC2, PC3, CD8T, CD4T, NK, Bcell, Mono, Gender, Age ** were used as covariates.  
+*4.1. Sensitivity analysis for smoking.* EWAS was performed by adding **Smoking Score** as a covariate.  
+*4.2. Sex stratified analysis.* EWAS was run separetly for males and females.  
+*4.2. Race stratified analysis.* EWAS was run separetly for Europens, African Americans and Hispanic/Latinos.  
+
+**5. Cell-specific differential methylation.** To identify cell-specific differences, we used the **TOAST** R package, using **PTSD** as the main effect and **Age/Sex** as covariates. 
+
+
+
+### Summary
+```{r, echo=FALSE, message=FALSE, results='hide', include=FALSE}
+##### LOAD FILES ######
+# phenotype file which have quality control information as well
+pheno.raw <- read.csv("Pheno_QC.csv")
+
+# phenotype file that includes only samples used in EWAS
+pheno <- read.csv("Pheno_QC_EWAS.csv")
+
+# Beta values
+beta <- local(get(load("IntermediaryFiles.RData")))
+
+# Beta values after removing cross hybridized probes
+beta_removed_cross <- fread("noob_qcd_crossReactiveProbesRemoved.csv", data.table = F)
+
+# Result of CPG association analysis
+results_cpg_asso <- local(get(load("EWAS.Rdata")))
+
+# smoking as covariate results
+smoking_res <- local(get(load("G:/DNHS_2nd_Batch(using PGC pipeline)/DNHS_EWAS_smoking.Rdata")))
+
+# cell-specific dm results
+cell_specific <- local(get(load("csDM_TOAST_significant(fdr=0.05).Rdata")))
+
+# Cross hybridized probes
+cross <- read.csv("cross.csv", stringsAsFactors = FALSE, header = TRUE)
+
+# Data that is used to estimated cell proportions
+idol_cpgs <- get(load("IDOLOptimizedCpGs_REF.Rdata"))
+
+```
+
+```{r, echo=FALSE}
+###### DEFINE VARIABLES #########
+ptsd <- " " # PTSD Variable, coded as 0 for controls and 1 for cases
+sex <- " "   # Sex Variable, coded as 0 for males and 1 for females
+age <- " "   # Age variable
+Race <- " " # Race variable 
+smoke <- " "   # Smoking variable, coded as 0 for non-smokers and 1 for smokers
+```
+
+```{r, echo=FALSE}
+#### RUNNING THE DEMOGRAPHICS, READ THE INSTRUCTIONS CAREFULLY ###
+# total number of samples 
+total_samps <- nrow(pheno)
+
+# Total number of cases and controls
+cases_control <- table(pheno[,ptsd])
+names(cases_control) <- c("Control", "Case")
+cases_control <-  paste(names(cases_control),"=", unname(cases_control), collapse = ", ")
+
+# Total number of female and male
+gender <- table(pheno[,sex])
+names(gender) <- c("M", "F")
+gender <-  paste(names(gender),"=", unname(gender), collapse = ", ")
+
+# mean age
+mean_age <- round(mean(pheno[,age], na.rm = T), digits = 2)
+sd_age <- round(sd(pheno[,age], na.rm = T), digits = 2)
+Age <- paste0(mean_age, "(", sd_age, ",", " ", min(pheno[,age], na.rm = T), "-", 
+              max(pheno[,age], na.rm = T), ")")
+
+# race - Please change according to your race coding
+race <- table(pheno[,Race])
+aa <- unname(race[names(race) == 4]) # African American
+ea <- unname(race[names(race) == 5]) # White
+others <- sum(race) - (aa + ea)
+
+if(!length(aa)) aa <- 0
+if(!length(ea)) ea <- 0
+if(!length(others)) others <- 0
+
+race <- paste0("AA = ",aa, ", EA = ",ea, ", other = ",others)
+
+#smoking information in percentage
+smoking <- table(pheno[,smoke], exclude = NULL, useNA = "ifany")
+n_missing <- round(unname(smoking[is.na(names(smoking))])/nrow(pheno)*100, digits = 3)
+n_no_smoking <- round(sum(unname(smoking[names(smoking) == 0]), na.rm = TRUE)/nrow(pheno)*100, digits = 3)
+n_smoking <- round(sum(unname(smoking[names(smoking) != 0]), na.rm = TRUE)/nrow(pheno)*100, digits = 3)
+names_vec <- c("Yes", "No", "NA")
+smoking_info <-  c(n_smoking, n_no_smoking, n_missing)
+smoking_info <- smoking_info[!is.na(smoking_info)] # due to na in smoking, some na is introduced
+smoking <- paste(names_vec, "=", smoking_info, collapse = ", ")
+
+# samples that failed 17 QC metrics
+qc_17m_info <- table(pheno$failed)
+qc_17m_info <- paste(names(qc_17m_info), "=", unname(qc_17m_info), collapse = ",")
+
+# Outliers based on genotypes
+outliers <- pheno[pheno$outlier > -4, ]
+
+# Total cross hybridized probes
+cross_probes <- nrow(cross)
+
+# Total cross hybridized probes in our dataset
+cross_in_our_df <- length(which(cross$Cpg %in% rownames(beta)))
+
+# Total bad probes
+bad_probes_rmv <- (nrow(beta) - nrow(beta_removed_cross)) - cross_in_our_df
+
+# Number of sex mismatch samples
+sex_mm <- length(which(pheno$SexMismatch == TRUE))
+
+# Number of significant cpgs
+significant_cpgs <- results_cpg_asso[results_cpg_asso$FDR < 0.05, ]
+
+# Smoking significant cpgs
+smoking_sig <- smoking_res[smoking_res$FDR < 0.05, ]
+
+# -----------------------------------------------------------------
+# Cell-specific DM significnat cpgs
+cell_specific_sig <- unlist(lapply(cell_specific, function(x) dim(x)[1]))
+cell_specific_sig <- paste0(names(cell_specific_sig), ":", 
+                            unname(cell_specific_sig), collapse = ", ")
+
+
+# Now make a list of all the variable you have
+lis <- list(total_samps, cases_control, gender, Age, race, smoking,
+            qc_17m_info, nrow(outliers), sex_mm,
+            nrow(beta), cross_probes, cross_in_our_df, bad_probes_rmv,
+            nrow(beta) - nrow(beta_removed_cross), 
+            nrow(idol_cpgs), nrow(significant_cpgs), nrow(smoking_sig), 
+            cell_specific_sig)
+
+
+# Combine row-wise and get the rownames for each entry
+sumry_df <- data.frame(do.call(rbind, lis))
+rownames(sumry_df) <- c("Total samples", 
+                        "Total control and case", 
+                        "Number of females and males",
+                        "Age - mean(SD, range)",
+                        "Race self reported",
+                        "Current smoking %",
+                        "Samples failed 17 QC metrics", 
+                        "Samples with outlier score > -4 (suggested by ewastools) ",
+                        "Sex mismatch",
+                        "CpGs in our dataset",
+                        "Cross hybridized probes (in ref paper)", 
+                        "Cross hybridized probes in our QCd dataset and removed",
+                        "Bad probes removed", 
+                        "Total probes removed (cross/bad)",
+                        "Probes used in cell proportion estimation",
+                        "Significant CpGs FDR < 0.05",
+                        "Significant CpGs FDR< 0.05 - Smoking as covariate",
+                        "Cell-specific CpGs FDR < 0.05")
+
+
+# name the column
+colnames(sumry_df) <- "Remarks"
+
+# Create table
+kable(sumry_df) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+```
+
+### Outlier Samples
+```{r outlier_samples, echo=FALSE}
+outlier_sub <- outliers[, 1:2]
+kable(outlier_sub, row.names = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+### Stratified Numbers
+```{r, echo=FALSE}
+cases <- pheno[pheno[ptsd] == 1,]
+controls <- pheno[pheno[ptsd] == 0,]
+
+# Total number of female and male
+gender.case <- table(cases[,sex])
+names(gender.case) <- c("M", "F")
+gender.case <-  paste(names(gender.case),"=", unname(gender.case), collapse = ", ")
+
+gender.control <- table(controls[,sex])
+names(gender.control) <- c("M", "F")
+gender.control <-  paste(names(gender.control),"=", unname(gender.control), collapse = ", ")
+
+# mean age
+mean_age.case <- round(mean(cases[,age], na.rm = T), digits = 2)
+sd_age.case <- round(sd(cases[,age], na.rm = T), digits = 2)
+Age.case <- paste0(mean_age.case, "(", sd_age.case, ",", " ", min(cases[,age], na.rm = T), "-", max(cases[,age], na.rm = T), ")")
+
+mean_age.control <- round(mean(controls[,age], na.rm = T), digits = 2)
+sd_age.control <- round(sd(controls[,age], na.rm = T), digits = 2)
+Age.control <- paste0(mean_age.control, "(", sd_age.control, ",", " ", min(controls[,age], na.rm = T), "-", max(controls[,age], na.rm = T), ")")
+
+# race - Please change according to your race coding
+race.case <- table(cases[,Race])
+aa.case <- unname(race.case[names(race.case) == 4]) # African American
+ea.case <- unname(race.case[names(race.case) == 5]) # White
+others.case <- sum(race.case) - (aa.case + ea.case)
+
+if(!length(aa.case)) aa.case <- 0
+if(!length(ea.case)) ea.case <- 0
+if(!length(others.case)) others.case <- 0
+
+race.case <- paste0("AA = ",aa.case, ", EA = ",ea.case, ", other = ",others.case)
+
+race.control <- table(controls[,Race])
+aa.control <- unname(race.control[names(race.control) == 4]) # African American
+ea.control <- unname(race.control[names(race.control) == 5]) # White
+others.control <- sum(race.control) - (aa.control + ea.control)
+
+if(!length(aa.control)) aa.control <- 0
+if(!length(ea.control)) ea.control <- 0
+if(!length(others.control)) others.control <- 0
+
+race.control <- paste0("AA = ",aa.control, ", EA = ",ea.control, ", other = ",others.control)
+
+#smoking information in percentage
+smoking.case <- table(cases[,smoke], exclude = NULL, useNA = "ifany")
+n_missing.case <- round(unname(smoking.case[is.na(names(smoking.case))])/nrow(cases)*100, digits = 3)
+n_no_smoking.case <- round(sum(unname(smoking.case[names(smoking.case) == 0]), na.rm = TRUE)/nrow(cases)*100, digits = 3)
+n_smoking.case <- round(sum(unname(smoking.case[names(smoking.case) != 0]), na.rm = TRUE)/nrow(cases)*100, digits = 3)
+names_vec <- c("Yes", "No", "NA")
+smoking_info.case <-  c(n_smoking.case, n_no_smoking.case, n_missing.case)
+smoking_info.case <- smoking_info.case[!is.na(smoking_info.case)] # due to na in smoking, some na is introduced
+smoking.case <- paste(names_vec, "=", smoking_info.case, collapse = ", ")
+
+smoking.control <- table(controls[,smoke], exclude = NULL, useNA = "ifany")
+n_missing.control <- round(unname(smoking.control[is.na(names(smoking.control))])/nrow(controls)*100, digits = 3)
+n_no_smoking.control <- round(sum(unname(smoking.control[names(smoking.control) == 0]), na.rm = TRUE)/nrow(controls)*100, digits = 3)
+n_smoking.control <- round(sum(unname(smoking.control[names(smoking.control) != 0]), na.rm = TRUE)/nrow(controls)*100, digits = 3)
+names_vec <- c("Yes", "No", "NA")
+smoking_info.control <-  c(n_smoking.control, n_no_smoking.control, n_missing.control)
+smoking_info.control <- smoking_info.control[!is.na(smoking_info.control)] # due to na in smoking, some na is introduced
+smoking.control <- paste(names_vec, "=", smoking_info.control, collapse = ", ")
+
+# Now make a list of all the variable you have
+lis.case <- list(gender.case, Age.case, race.case, smoking.case)
+lis.control <- list(gender.control, Age.control, race.control, smoking.control)
+
+# Combine row-wise and then col-wise
+sumry_df.case <- data.frame(do.call(rbind, lis.case))
+sumry_df.control <- data.frame(do.call(rbind, lis.control))
+sumry_df <- data.frame(cbind(sumry_df.case, sumry_df.control))
+
+# Name rows and cols
+rownames(sumry_df) <- c("Number of females and males",
+                        "Age - mean(SD, range)",
+                        "Race self reported",
+                        "Current smoking %")
+colnames(sumry_df) <- c(paste0("Cases (N = ",nrow(cases),")"),
+                        paste0("Controls (N = ",nrow(controls),")"))
+
+# Create table
+kable(sumry_df) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+```
