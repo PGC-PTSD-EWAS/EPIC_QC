@@ -160,11 +160,11 @@ row.names(beta)<-beta$V1
 beta<-beta[,-1]
 
 # Load the new phenotype file with QC info
-pheno <- read.csv("Pheno_QC.csv", stringsAsFactors = FALSE, header = TRUE)
-row.names(pheno)<-pheno$SampleID
+phen <- read.csv("Pheno_QC.csv", stringsAsFactors = FALSE, header = TRUE)
+row.names(phen)<-pheno$SampleID
 
 # Remove the failed samples and sex mismatches
-phen <- subset(pheno, failed == "FALSE" & SexMismatch == "FALSE")
+phen <- subset(phen, failed == "FALSE" & SexMismatch == "FALSE")
 
 # Methylation IDs (Row names of phenotype file and Column names of beta matrix) should match
 beta <- beta[, which(names(beta) %in% row.names(phen))]
