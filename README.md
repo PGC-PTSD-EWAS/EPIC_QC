@@ -19,10 +19,10 @@ Then beta values were imputed followed by ComBAT adjustment for chip id and posi
 ### 3.Cell proportion estimation and calculating principal components and smoking scores.  
 **Script 3: PGCpipeline-3-CellCountsCalculation_forEPIC.R**  
 We used [IDOL algorithm](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-016-0943-7) 
-to estimate the cell proportions. 
-**Script 3.1: PGCpipeline-3.1-mPCs.R**. 
-Principal components were calculated as described in [Barfield et al](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4090102/). If you have GWAS data, it is recommended to use that for calculating PCs. In that case you don't need to use *Barfield* approach.
-**Script 3.2: PGCpipeline-3.2-smoking.R**  
+to estimate the cell proportions.  
+**Script 3.1: PGCpipeline-3.1-mPCs.R**.   
+Principal components were calculated as described in [Barfield et al](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4090102/). If you have GWAS data, it is recommended to use that for calculating PCs. In that case you don't need to use *Barfield* approach.  
+**Script 3.2: PGCpipeline-3.2-smoking.R**    
 This script uses 39 probes to estimate a smoking score.
 
 
