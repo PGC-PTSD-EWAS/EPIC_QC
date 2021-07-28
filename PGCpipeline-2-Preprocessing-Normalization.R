@@ -30,7 +30,7 @@ lapply(c(bioc_packages, cran_packages), require, character.only = TRUE)
 #' Input: path to the idats, Phenotype file
 #' Output: RGset, Mset, GMset in a list
 read_idat_files <- function(path, pheno_file){
-  RGset <- read.metharray.exp(path, recursive = TRUE, verbose = TRUE)
+  RGset <- read.metharray.exp(path, recursive = TRUE, verbose = TRUE, force = TRUE)
   RGset <- RGset[, colnames(RGset) %in% pheno$SampleID]
 
   if(!all(colnames(RGset) %in% pheno$SampleID)){
