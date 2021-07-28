@@ -98,6 +98,9 @@ all_info <- check_sex_info(inputdata = output, pheno_file = pheno, pheno_sex_col
 lapply(all_info[c(2:4)], function(x) all(colnames(x) %in% all_info$pheno$SampleID))
 
 # Write predicted sex onto the phenotype file and flag the mismatches
+pheno <- pheno[order(pheno$SampleID),]
+all_info$predicted_sex <- all_info$predicted_sex[order(rownames(all_info$predicted_sex)),]
+all(rownames(all_info$predicted_sex)==pheno$SampleID) # This should be TRUE
 pheno$predictedSex <- all_info$predicted_sex$predictedSex
 if(all(0|1%in%pheno$Sex) == T) {
   pheno$predictedSex[pheno$predictedSex == "M"] <- 0 
