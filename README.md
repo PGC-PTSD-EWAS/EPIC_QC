@@ -41,3 +41,5 @@ To identify cell-specific differences, we used the [TOAST R package](https://www
 ### 6. Rmarkdown Summary.
 **Script 6: PGC_Analysis_Summary.Rmd**  
 R Markdown document for the summary of cross-sectional analysis using PGC pipeline.
+
+[![DOI](https://zenodo.org/badge/353804658.svg)](https://zenodo.org/badge/latestdoi/353804658)
