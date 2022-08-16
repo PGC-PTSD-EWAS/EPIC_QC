@@ -52,6 +52,7 @@ cpg_assoc_test <- function(cpg, pheno, covar){
   assoc <- test$results
   eff <- test$coefficients
   results <- cbind(assoc, eff)
+  return(list(results = results, test = test))
 }
 
 # Run EWAS with CpGAssoc
