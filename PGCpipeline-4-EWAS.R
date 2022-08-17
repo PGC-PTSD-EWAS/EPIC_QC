@@ -37,6 +37,9 @@ study <- "DNHS" # name of the study, e.g. "GTP", "DNHS" etc.
 ptsdVar <- "PTSDpm" # name of the ptsd variable, coded as: cases = 1 and controls = 0
 ptsd <- pheno[, ptsdVar, FALSE]
 
+## PTSD variable should be numeric
+cleaned_df$pheno[, ptsdVar] <- as.numeric(cleaned_df$pheno[, ptsdVar])
+
 ## Define covariates to be adjusted for EWAS
 ## Covariates to be included:
 ##  - cell types from step 3 ("CD8T","CD4T","NK","Bcell","Mono")
